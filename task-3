@@ -1,0 +1,60 @@
+** Step 1: Import the libraries **
+
+import pandas as pd
+import numpy as np
+from sklearn import datasets
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
+
+** Step 2: Load the dataset **
+
+iris = datasets.load_iris()
+iris_data = pd.DataFrame(data=iris.data, columns=iris.feature_names)
+iris_data['species'] = iris.target
+iris_data['species'] = iris_data['species'].map({0: 'setosa', 1: 'versicolor', 2: 'virginica'})
+
+** Step 3: Explore the dataset **
+
+print("First 5 rows of the dataset:")
+print(iris_data.head())
+
+print("\nDataset info:")
+print(iris_data.info())
+
+print("\nClass distribution:")
+print(iris_data['species'].value_counts())
+
+** Step 4: Split features and target **
+
+X = iris_data.drop('species', axis=1)
+y = iris_data['species']
+
+** Step 5: Train-test split **
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+** Step 6: Logistic Regression Model **
+
+log_reg = LogisticRegression(max_iter=200)
+log_reg.fit(X_train, y_train)
+log_reg_pred = log_reg.predict(X_test)
+log_reg_accuracy = accuracy_score(y_test, log_reg_pred)
+print("\nLogistic Regression Accuracy:", log_reg_accuracy)
+
+** Step 7: Random Forest Model **
+
+rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+rf_model.fit(X_train, y_train)
+rf_pred = rf_model.predict(X_test)
+rf_accuracy = accuracy_score(y_test, rf_pred)
+print("Random Forest Accuracy:", rf_accuracy)
+
+** Step 8: Classification Reports **
+
+print("\nLogistic Regression Classification Report:")
+print(classification_report(y_test, log_reg_pred))
+
+print("\nRandom Forest Classification Report:")
+print(classification_report(y_test, rf_pred))
