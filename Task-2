@@ -1,0 +1,331 @@
+# IMDb Indian Movies Data Analysis - Final Complete Code
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import LabelEncoder
+import os
+import warnings
+warnings.filterwarnings('ignore')
+
+# Set up visualization style
+plt.style.use('default')
+sns.set_palette("husl")
+
+def main():
+    print("🔍 IMDb Indian Movies Data Analysis Project")
+    print("=" * 50)
+    
+    # =========================================================================
+    # 1. LOAD AND INSPECT DATA
+    # =========================================================================
+    print("\n1. LOADING AND INSPECTING DATA")
+    print("-" * 40)
+    
+    # Load the dataset
+    try:
+        df = pd.read_csv("IMDb Movies India.csv", encoding='utf-8')
+        print("✅ Dataset loaded successfully!")
+    except:
+        try:
+            df = pd.read_csv("IMDb Movies India.csv", encoding='latin-1')
+            print("✅ Dataset loaded with latin-1 encoding!")
+        except:
+            print("❌ Could not load the file. Please check the filename.")
+            return
+    
+    print(f"📊 Dataset Shape: {df.shape}")
+    print("\nFirst 3 rows of the dataset:")
+    print(df.head(3))
+    
+    print("\nDataset Info:")
+    print(df.info())
+    
+    print("\nMissing values before cleaning:")
+    print(df.isnull().sum())
+    
+    # =========================================================================
+    # 2. DATA CLEANING
+    # =========================================================================
+    print("\n\n2. DATA CLEANING AND PREPROCESSING")
+    print("-" * 40)
+    
+    # Rename columns to standard names (adjust based on your actual column names)
+    column_mapping = {
+        'Name': 'name',
+        'Year': 'year', 
+        'Duration': 'duration',
+        'Genre': 'genre',
+        'Rating': 'rating',
+        'Votes': 'votes',
+        'Director': 'director',
+        'Actor 1': 'actor1',
+        'Actor 2': 'actor2',
+        'Actor 3': 'actor3'
+    }
+    
+    # Rename columns that exist in the dataset
+    for old_name, new_name in column_mapping.items():
+        if old_name in df.columns:
+            df.rename(columns={old_name: new_name}, inplace=True)
+    
+    # Handle missing values
+    print("🧹 Handling missing values...")
+    
+    # Clean year column (remove parentheses)
+    if 'year' in df.columns:
+        df['year'] = df['year'].astype(str).str.replace(r'[\(\)]', '', regex=True)
+        df['year'] = pd.to_numeric(df['year'], errors='coerce')
+    
+    # Clean duration column (remove min)
+    if 'duration' in df.columns:
+        df['duration'] = df['duration'].astype(str).str.replace(' min', '')
+        df['duration'] = pd.to_numeric(df['duration'], errors='coerce')
+    
+    # Clean rating column
+    if 'rating' in df.columns:
+        df['rating'] = pd.to_numeric(df['rating'], errors='coerce')
+    
+    # Clean votes column (remove commas)
+    if 'votes' in df.columns:
+        df['votes'] = df['votes'].astype(str).str.replace(',', '')
+        df['votes'] = pd.to_numeric(df['votes'], errors='coerce')
+    
+    # Fill missing values
+    numeric_cols = ['year', 'duration', 'rating', 'votes']
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col].fillna(df[col].median(), inplace=True)
+    
+    # Fill text columns
+    text_cols = ['name', 'genre', 'director', 'actor1', 'actor2', 'actor3']
+    for col in text_cols:
+        if col in df.columns:
+            df[col].fillna('Unknown', inplace=True)
+    
+    # Remove duplicates
+    initial_count = len(df)
+    df.drop_duplicates(inplace=True)
+    final_count = len(df)
+    print(f"🧹 Removed {initial_count - final_count} duplicate rows")
+    
+    print("\nMissing values after cleaning:")
+    print(df.isnull().sum())
+    
+    # =========================================================================
+    # 3. EXPLORATORY DATA ANALYSIS
+    # =========================================================================
+    print("\n\n3. EXPLORATORY DATA ANALYSIS")
+    print("-" * 40)
+    
+    # Create output directory for plots
+    os.makedirs('analysis_plots', exist_ok=True)
+    
+    # 3.1 Year with best rating (Weighted Average)
+    print("\n🎯 3.1 Year with Best Rating")
+    def weighted_rating(group):
+        v = group['votes']
+        R = group['rating']
+        return (v * R).sum() / v.sum() if v.sum() > 0 else 0
+    
+    yearly_avg = df.groupby('year')['rating'].mean()
+    yearly_weighted_avg = df.groupby('year').apply(weighted_rating)
+    
+    best_year = yearly_weighted_avg.idxmax()
+    best_rating = yearly_weighted_avg.max()
+    
+    plt.figure(figsize=(14, 6))
+    yearly_weighted_avg.plot(kind='line', marker='o', color='steelblue', linewidth=2)
+    plt.title('Weighted Average Movie Rating by Year', fontsize=16, fontweight='bold')
+    plt.xlabel('Year', fontsize=12)
+    plt.ylabel('Weighted Average Rating', fontsize=12)
+    plt.grid(True, alpha=0.3)
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig('analysis_plots/yearly_ratings.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    print(f"🏆 Best Year: {best_year} with weighted rating: {best_rating:.2f}")
+    
+    # 3.2 Impact of Movie Duration on Rating
+    print("\n🎯 3.2 Impact of Movie Duration on Rating")
+    correlation = df['duration'].corr(df['rating'])
+    
+    plt.figure(figsize=(12, 6))
+    sns.scatterplot(x='duration', y='rating', data=df, alpha=0.6, color='blue')
+    plt.title('Movie Rating vs. Duration', fontsize=16, fontweight='bold')
+    plt.xlabel('Duration (minutes)', fontsize=12)
+    plt.ylabel('Rating', fontsize=12)
+    plt.tight_layout()
+    plt.savefig('analysis_plots/duration_vs_rating.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    print(f"📊 Correlation coefficient: {correlation:.3f}")
+    if correlation > 0.2:
+        print("💡 Insight: Longer movies tend to have higher ratings")
+    elif correlation < -0.2:
+        print("💡 Insight: Shorter movies tend to have higher ratings")
+    else:
+        print("💡 Insight: Little correlation between duration and rating")
+    
+    # 3.3 Top 10 Movies Overall
+    print("\n🎯 3.3 Top 10 Movies Overall")
+    # Filter movies with sufficient votes (top 25%)
+    vote_threshold = df['votes'].quantile(0.75)
+    top_movies = df[df['votes'] > vote_threshold].nlargest(10, 'rating')
+    
+    print("🎬 Top 10 Highly-Rated Popular Movies:")
+    for i, (idx, row) in enumerate(top_movies.iterrows(), 1):
+        print(f"{i}. {row['name']} ({row['year']}) - Rating: {row['rating']:.1f}, Votes: {row['votes']:,}")
+    
+    # 3.4 Number of Movies Released Each Year
+    print("\n🎯 3.4 Number of Movies Released Each Year")
+    movies_per_year = df['year'].value_counts().sort_index()
+    
+    plt.figure(figsize=(14, 6))
+    movies_per_year.plot(kind='bar', color='lightcoral', alpha=0.7)
+    plt.title('Number of Movies Released Each Year', fontsize=16, fontweight='bold')
+    plt.xlabel('Year', fontsize=12)
+    plt.ylabel('Number of Movies', fontsize=12)
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig('analysis_plots/movies_per_year.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    most_prolific_year = movies_per_year.idxmax()
+    print(f"📈 Year with most movies: {most_prolific_year} ({movies_per_year.max()} movies)")
+    
+    # 3.5 Top Directors
+    print("\n🎯 3.5 Top Directors by Number of Movies")
+    if 'director' in df.columns:
+        top_directors = df['director'].value_counts().head(10)
+        
+        plt.figure(figsize=(12, 8))
+        top_directors.plot(kind='barh', color='lightseagreen')
+        plt.title('Top 10 Directors by Number of Movies', fontsize=16, fontweight='bold')
+        plt.xlabel('Number of Movies', fontsize=12)
+        plt.gca().invert_yaxis()
+        plt.tight_layout()
+        plt.savefig('analysis_plots/top_directors.png', dpi=300, bbox_inches='tight')
+        plt.show()
+        
+        print("🎬 Most Prolific Directors:")
+        for i, (director, count) in enumerate(top_directors.items(), 1):
+            print(f"{i}. {director}: {count} movies")
+    
+    # 3.6 Top Actors
+    print("\n🎯 3.6 Top Actors by Number of Movies")
+    if all(col in df.columns for col in ['actor1', 'actor2', 'actor3']):
+        # Combine all actor columns
+        all_actors = pd.concat([df['actor1'], df['actor2'], df['actor3']])
+        top_actors = all_actors.value_counts().head(10)
+        
+        plt.figure(figsize=(12, 8))
+        top_actors.plot(kind='barh', color='mediumpurple')
+        plt.title('Top 10 Actors by Number of Movies', fontsize=16, fontweight='bold')
+        plt.xlabel('Number of Movies', fontsize=12)
+        plt.gca().invert_yaxis()
+        plt.tight_layout()
+        plt.savefig('analysis_plots/top_actors.png', dpi=300, bbox_inches='tight')
+        plt.show()
+        
+        print("🌟 Most Active Actors:")
+        for i, (actor, count) in enumerate(top_actors.items(), 1):
+            print(f"{i}. {actor}: {count} movies")
+    
+    # 3.7 Genre Analysis
+    print("\n🎯 3.7 Most Common Genres")
+    if 'genre' in df.columns:
+        # Split genres and count
+        all_genres = df['genre'].str.split(', ').explode()
+        top_genres = all_genres.value_counts().head(10)
+        
+        plt.figure(figsize=(12, 8))
+        top_genres.plot(kind='barh', color='goldenrod')
+        plt.title('Top 10 Movie Genres', fontsize=16, fontweight='bold')
+        plt.xlabel('Number of Movies', fontsize=12)
+        plt.gca().invert_yaxis()
+        plt.tight_layout()
+        plt.savefig('analysis_plots/top_genres.png', dpi=300, bbox_inches='tight')
+        plt.show()
+        
+        print("🎭 Most Common Genres:")
+        for i, (genre, count) in enumerate(top_genres.items(), 1):
+            print(f"{i}. {genre}: {count} movies")
+    
+    # =========================================================================
+    # 4. SAVE RESULTS
+    # =========================================================================
+    print("\n\n4. SAVING RESULTS")
+    print("-" * 40)
+    
+    # Save cleaned data
+    df.to_csv('cleaned_imdb_indian_movies.csv', index=False)
+    print("✅ Cleaned data saved as 'cleaned_imdb_indian_movies.csv'")
+    
+    # Save top movies to CSV
+    top_movies.to_csv('top_10_movies.csv', index=False)
+    print("✅ Top 10 movies saved as 'top_10_movies.csv'")
+    
+    # Save analysis results to text file
+    with open('analysis_results.txt', 'w', encoding='utf-8') as f:
+        f.write("IMDb INDIAN MOVIES ANALYSIS RESULTS\n")
+        f.write("=" * 50 + "\n\n")
+        
+        f.write("SUMMARY STATISTICS:\n")
+        f.write(f"Total movies analyzed: {len(df):,}\n")
+        f.write(f"Time period: {df['year'].min()} to {df['year'].max()}\n")
+        f.write(f"Average rating: {df['rating'].mean():.2f}/10\n")
+        f.write(f"Average duration: {df['duration'].mean():.1f} minutes\n")
+        f.write(f"Total votes: {df['votes'].sum():,}\n\n")
+        
+        f.write("KEY FINDINGS:\n")
+        f.write(f"1. Best Year: {best_year} (Rating: {best_rating:.2f})\n")
+        f.write(f"2. Duration-Rating Correlation: {correlation:.3f}\n")
+        if 'director' in df.columns:
+            f.write(f"3. Top Director: {top_directors.index[0]} ({top_directors.iloc[0]} movies)\n")
+        if all(col in df.columns for col in ['actor1', 'actor2', 'actor3']):
+            f.write(f"4. Top Actor: {top_actors.index[0]} ({top_actors.iloc[0]} movies)\n")
+        f.write(f"5. Most Prolific Year: {most_prolific_year} ({movies_per_year.max()} movies)\n\n")
+        
+        f.write("TOP 10 MOVIES:\n")
+        for i, row in top_movies.iterrows():
+            f.write(f"{row['name']} ({row['year']}) - Rating: {row['rating']:.1f}, Votes: {row['votes']:,}\n")
+    
+    print("✅ Analysis results saved as 'analysis_results.txt'")
+    print("✅ Visualizations saved in 'analysis_plots' folder")
+    
+    # =========================================================================
+    # 5. FINAL RESULTS SUMMARY
+    # =========================================================================
+    print("\n\n5. FINAL RESULTS SUMMARY")
+    print("=" * 50)
+    
+    print(f"\n📊 DATASET OVERVIEW:")
+    print(f"   • Total movies analyzed: {len(df):,}")
+    print(f"   • Time span: {int(df['year'].min())} - {int(df['year'].max())}")
+    print(f"   • Average rating: {df['rating'].mean():.2f}/10")
+    print(f"   • Average duration: {df['duration'].mean():.1f} minutes")
+    print(f"   • Total votes: {df['votes'].sum():,}")
+    
+    print(f"\n🏆 KEY FINDINGS:")
+    print(f"   • Best year: {best_year} (rating: {best_rating:.2f})")
+    print(f"   • Duration impact: Correlation = {correlation:.3f}")
+    if 'director' in df.columns:
+        print(f"   • Most prolific director: {top_directors.index[0]} ({top_directors.iloc[0]} movies)")
+    if all(col in df.columns for col in ['actor1', 'actor2', 'actor3']):
+        print(f"   • Most active actor: {top_actors.index[0]} ({top_actors.iloc[0]} movies)")
+    print(f"   • Year with most movies: {most_prolific_year} ({movies_per_year.max()} movies)")
+    
+    print(f"\n💾 FILES GENERATED:")
+    print(f"   1. cleaned_imdb_indian_movies.csv - Cleaned dataset")
+    print(f"   2. top_10_movies.csv - Top 10 highest-rated movies")
+    print(f"   3. analysis_results.txt - Complete analysis summary")
+    print(f"   4. analysis_plots/ - Folder with 5 visualizations")
+    
+    print(f"\n🎉 ANALYSIS COMPLETE! Your internship task is ready for submission!")
+    print("   Share all the generated files with your supervisor.")
+
+# Run the analysis
+if __name__ == "__main__":
+    main()
