@@ -1,0 +1,83 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import classification_report, confusion_matrix
+
+# 1. Load the dataset
+iris = load_iris()
+# Create a pandas DataFrame for easier manipulation
+iris_df = pd.DataFrame(data=iris.data, columns=iris.feature_names)
+iris_df['species'] = pd.Categorical.from_codes(iris.target, iris.target_names)
+
+# --- --- --- --- ---
+# 2. Explore the data
+# Display the first 5 rows of the dataset
+print("--- First 5 Rows of the Iris Dataset ---")
+print(iris_df.head())
+print("\n" + "="*40 + "\n")
+
+# Display a concise summary of the DataFrame
+print("--- Dataset Information ---")
+iris_df.info()
+print("\n" + "="*40 + "\n")
+
+# Display descriptive statistics
+print("--- Descriptive Statistics ---")
+print(iris_df.describe())
+print("\n" + "="*40 + "\n")
+
+
+# --- --- --- --- ---
+# 3. Visualize the data
+# Create a pair plot to visualize relationships between features
+print("--- Generating Pair Plot Visualization ---")
+sns.pairplot(iris_df, hue='species', markers=["o", "s", "D"])
+plt.suptitle("Pair Plot of Iris Dataset Features by Species", y=1.02)
+plt.show()
+
+
+# --- --- --- --- ---
+# 4. Prepare data for machine learning
+# Separate features (X) and target (y)
+X = iris.data
+y = iris.target
+
+# Split the data into training and testing sets (80% train, 20% test)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42, stratify=y)
+
+
+# --- --- --- --- ---
+# 5. Train a Support Vector Machine (SVM) Classifier
+print("--- Training the SVM Classifier ---")
+model = SVC(kernel='linear', random_state=42)
+model.fit(X_train, y_train)
+print("Model training complete.")
+print("\n" + "="*40 + "\n")
+
+
+# --- --- --- --- ---
+# 6. Evaluate the model
+print("--- Model Evaluation on Test Data ---")
+# Make predictions on the test data
+y_pred = model.predict(X_test)
+
+# Print the classification report
+print("Classification Report:")
+print(classification_report(y_test, y_pred, target_names=iris.target_names))
+
+# Print the confusion matrix
+print("Confusion Matrix:")
+conf_matrix = confusion_matrix(y_test, y_pred)
+print(conf_matrix)
+
+# Visualize the confusion matrix
+plt.figure(figsize=(8, 6))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', 
+            xticklabels=iris.target_names, yticklabels=iris.target_names)
+plt.xlabel('Predicted Label')
+plt.ylabel('True Label')
+plt.title('Confusion Matrix for SVM Classifier')
+plt.show()
