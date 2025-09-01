@@ -1,0 +1,134 @@
+# fraud_detection.py
+
+# ==============================================================================
+# Importing necessary libraries
+# ==============================================================================
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import classification_report, confusion_matrix, f1_score
+from sklearn.ensemble import RandomForestClassifier
+from imblearn.over_sampling import SMOTE
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# ==============================================================================
+# 1. Data Simulation (as a substitute for a real dataset)
+# ==============================================================================
+# This section creates a synthetic dataset with imbalanced classes,
+# mimicking real-world fraudulent transaction data.
+# ------------------------------------------------------------------------------
+np.random.seed(42) # for reproducibility
+
+# Total number of transactions
+n_transactions = 100000
+
+# Create genuine transactions (99.5% of the data)
+genuine_count = int(n_transactions * 0.995)
+genuine_data = {
+    'transaction_amount': np.random.normal(loc=50, scale=20, size=genuine_count),
+    'time_of_day_hours': np.random.uniform(0, 24, size=genuine_count),
+    'is_fraud': np.zeros(genuine_count, dtype=int)
+}
+
+# Create fraudulent transactions (0.5% of the data)
+fraud_count = n_transactions - genuine_count
+fraud_data = {
+    'transaction_amount': np.random.normal(loc=200, scale=75, size=fraud_count),
+    'time_of_day_hours': np.random.uniform(1, 4, size=fraud_count), # Fraud often happens late at night/early morning
+    'is_fraud': np.ones(fraud_count, dtype=int)
+}
+
+# Combine and shuffle the data
+df_genuine = pd.DataFrame(genuine_data)
+df_fraud = pd.DataFrame(fraud_data)
+df = pd.concat([df_genuine, df_fraud], ignore_index=True)
+df = df.sample(frac=1, random_state=42).reset_index(drop=True)
+
+print("Generated Dataset Info:")
+print(df.info())
+print("\nClass distribution before handling imbalance:")
+print(df['is_fraud'].value_counts())
+print("-" * 50)
+
+# ==============================================================================
+# 2. Preprocessing and Data Splitting
+# ==============================================================================
+# Separating features (X) and target variable (y)
+X = df[['transaction_amount', 'time_of_day_hours']]
+y = df['is_fraud']
+
+# Splitting the data into training and testing sets
+# We use stratify=y to ensure the test set has the same fraud ratio as the original data.
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Normalizing the numerical features using StandardScaler
+# This is crucial for models that are sensitive to the scale of the data.
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+print("Data split complete. X_train shape:", X_train_scaled.shape)
+print("X_test shape:", X_test_scaled.shape)
+print("-" * 50)
+
+# ==============================================================================
+# 3. Handling Class Imbalance
+# ==============================================================================
+# We will use the SMOTE (Synthetic Minority Over-sampling Technique)
+# to oversample the minority class (fraudulent transactions) in the training data.
+# This helps the model learn the characteristics of the fraudulent class.
+# ------------------------------------------------------------------------------
+print("Applying SMOTE for oversampling...")
+smote = SMOTE(random_state=42)
+X_train_smote, y_train_smote = smote.fit_resample(X_train_scaled, y_train)
+
+print("Class distribution after SMOTE:")
+print(pd.Series(y_train_smote).value_counts())
+print("-" * 50)
+
+# ==============================================================================
+# 4. Model Training
+# ==============================================================================
+# We will train a RandomForestClassifier, which is an excellent choice
+# for this type of problem due to its robustness and ability to handle
+# complex relationships.
+# ------------------------------------------------------------------------------
+print("Training the RandomForestClassifier model...")
+model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+model.fit(X_train_smote, y_train_smote)
+
+print("Model training complete.")
+print("-" * 50)
+
+# ==============================================================================
+# 5. Model Evaluation
+# ==============================================================================
+# Evaluating the model's performance on the unseen test data.
+# We will use precision, recall, and F1-score, as well as a confusion matrix.
+# ------------------------------------------------------------------------------
+print("Evaluating model performance on the test set...")
+y_pred = model.predict(X_test_scaled)
+
+# Generating a classification report
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred, target_names=['Genuine', 'Fraud']))
+
+# Generating and visualizing the confusion matrix
+cm = confusion_matrix(y_test, y_pred)
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['Genuine', 'Fraud'], yticklabels=['Genuine', 'Fraud'])
+plt.title('Confusion Matrix')
+plt.ylabel('Actual Label')
+plt.xlabel('Predicted Label')
+plt.show()
+
+# F1-Score for the fraudulent class (the positive class, label 1)
+f1 = f1_score(y_test, y_pred, pos_label=1)
+print(f"F1-Score for Fraudulent Transactions: {f1:.4f}")
+
+# End of script output
+print("\nScript execution finished. The model has been trained and evaluated.")
